@@ -40,9 +40,6 @@ youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
                         'd' : [0.036, 0.111, 0.0, 0.0, 0.113],
                         'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
-# Define the frame names
-name_link = ['arm5b_link_1', 'arm5b_link_2', 'arm5b_link_3', 'arm5b_link_4', 'arm5b_link_5']
-
 def rotmat2q(R):
 # Function for converting a 3x3 Rotation matrix R to quaternion conversion q
     q = Quaternion()
@@ -181,9 +178,9 @@ def fkine_wrapper(joint_msg, br):
 
         transform.header.stamp = rospy.Time.now()
         
-        transform.header.frame_id = 'world'
+        transform.header.frame_id = 'base_link'
         
-        transform.child.frame_id = name_link[i]
+        transform.child.frame_id = 'arm5b_link_'+str(i+1)
         
         transform.transform.translation.x = T[0, 3]
         transform.transform.translation.y = T[1, 3]
@@ -192,7 +189,6 @@ def fkine_wrapper(joint_msg, br):
         
         br.sendTransform(transform)
         
-    return None
     # your code ends here ------------------------------
 
 
