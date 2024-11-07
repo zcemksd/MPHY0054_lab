@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import rospy
+from math import pi
 import numpy as np
+from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped, Quaternion
@@ -33,11 +35,13 @@ see all the frames stacked in the z axis (the home position).
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5a.
 
 
-youbot_dh_parameters = {'a':[, , , , ],
-                        'alpha': [, , , , ],
-                        'd' : [, , , , ],
-                        'theta' : [, , , , ]}
+youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
+                        'alpha': [0.0, pi/2, 0.0, 0, -pi/2],
+                        'd' : [0.036, 0.111, 0.0, 0.0, 0.113],
+                        'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
+# Define the frame names
+name_link = ['link_1', 'link_2', 'link_3', 'link_4', 'link_5']
 
 def rotmat2q(R):
 # Function for converting a 3x3 Rotation matrix R to quaternion conversion q
@@ -90,7 +94,26 @@ def standard_dh(a, alpha, d, theta):
     A = np.zeros((4, 4))
 
     # your code starts here -----------------------------
-
+    A[0, 0] = np.cos(theta)
+    A[0, 1] = -np.sin(theta) * np.cos(alpha)
+    A[0, 2] = np.sin(theta) * np.sin(alpha)
+    A[0, 3] = a * np.cos(theta)
+    
+    A[1, 0] = np.sin(theta)
+    A[1, 1] = np.cos(theta) * np.cos(alpha)
+    A[1, 2] = -np.cos(theta) * np.sin(alpha)
+    A[1, 3] = a * np.sin(theta)
+    
+    A[2, 0] = 0.0
+    A[2, 1] = np.sin(alpha)
+    A[2, 2] = np.cos(alpha)
+    A[2, 3] = d
+    
+    A[3, 0] = 0.0
+    A[3, 1] = 0.0
+    A[3, 2] = 0.0
+    A[3, 3] = 1.0
+ 
     
     # your code ends here ------------------------------
 
@@ -120,11 +143,19 @@ def forward_kinematics(dh_dict, joints_readings, up_to_joint=5):
     assert up_to_joint<=len(dh_dict['a'])
     
     T = np.identity(4)
+    
     # your code starts here ------------------------------
-
+    a = youbot_dh_parameters['a']
+    alpha = youbot_dh_parameters['alpha']
+    d = youbot_dh_parameters['d']
+    theta = youbot_dh_parameters['theta']
+    
+    for i in range(up_to_joint):
+        T_i = standard_dh(a[i], alpha[i], d[i], theta[i] + joints_readings[i])
+        T = T @ T_i
 
     # your code ends here -------------------------------
-
+    
     assert isinstance(T, np.ndarray), "Output wasn't of type ndarray"
     assert T.shape == (4,4), "Output had wrong dimensions"
     return T
@@ -148,7 +179,24 @@ def fkine_wrapper(joint_msg, br):
     assert isinstance(joint_msg, JointState), "Node must subscribe to a topic where JointState messages are published"
     # your code starts here ------------------------------
     
+    transform = TransformStamped()
+    for i in range(5):
+        T = forward_kinematics(youbot_dh_parameters, list(joint_msg.position), i+1)
+
+        transform.header.stamp = rospy.Time.now()
         
+        transform.header.frame_id = 'world'
+        
+        transform.child.frame_id = name_link[i]
+        
+        transform.transform.translation.x = T[0, 3]
+        transform.transform.translation.y = T[1, 3]
+        transform.transform.translation.z = T[2, 3]
+        transform.transform.rotation = rotmat2q(T)
+        
+        br.sendTransform(transform)
+        
+    return None
     # your code ends here ------------------------------
 
 
@@ -165,6 +213,8 @@ def main():
     # as callback and pass the broadcaster as an additional argument to the callback
     
     # your code starts here ------------------------------
+  
+    sub = rospy.Subscriber('/joint_States', JointState, fkine_wrapper, br)
 
     # your code ends here ----------------------
     
