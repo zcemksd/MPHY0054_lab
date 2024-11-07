@@ -35,13 +35,13 @@ see all the frames stacked in the z axis (the home position).
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5a.
 
 
-youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
-                        'alpha': [0.0, pi/2, 0.0, 0.0, -pi/2],
-                        'd' : [0.036, 0.111, 0.0, 0.0, 0.113],
-                        'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
+youbot_dh_parameters = {'a':[0.0, 0.155, 0.135, 0.0, 0.0],
+                        'alpha': [pi/2, 0.0, 0.0, pi/2, 0.0],
+                        'd' : [0.147, 0.0, 0.0, 0.0, 0.113],
+                        'theta' : [0.0, pi/2, 0.0, pi/2, 0.0]}
 
 # Define the frame names
-name_link = ['arm_link_1', 'arm_link_2', 'arm_link_3', 'arm_link_4', 'arm_link_5']
+name_link = ['arm5b_link_1', 'arm5b_link_2', 'arm5b_link_3', 'arm5b_link_4', 'arm5b_link_5']
 
 def rotmat2q(R):
 # Function for converting a 3x3 Rotation matrix R to quaternion conversion q
@@ -152,7 +152,7 @@ def forward_kinematics(dh_dict, joints_readings, up_to_joint=5):
     
     for i in range(up_to_joint):
         T_i = standard_dh(a[i], alpha[i], d[i], theta[i] + joints_readings[i])
-        T = np.dot(T, T_i)
+        T = T @ T_i
 
     # your code ends here -------------------------------
     
