@@ -35,11 +35,13 @@ see all the frames stacked in the z axis (the home position).
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5a.
 
 
-youbot_dh_parameters = {'a':[, , , , ],
-                        'alpha': [, , , , ],
-                        'd' : [, , , , ],
-                        'theta' : [, , , , ]}
+youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
+                        'alpha': [0.0, pi/2, 0.0, 0, -pi/2],
+                        'd' : [0.036, 0.111, 0.0, 0.0, 0.113],
+                        'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
+# Define the frame names
+name_link = ['link_1', 'link_2', 'link_3', 'link_4', 'link_5']
 
 def rotmat2q(R):
 # Function for converting a 3x3 Rotation matrix R to quaternion conversion q
@@ -177,7 +179,24 @@ def fkine_wrapper(joint_msg, br):
     assert isinstance(joint_msg, JointState), "Node must subscribe to a topic where JointState messages are published"
     # your code starts here ------------------------------
     
+    transform = TransformStamped()
+    for i in range(5):
+        T = forward_kinematics(youbot_dh_parameters, list(joint_msg.position), i+1)
+
+        transform.header.stamp = rospy.Time.now()
         
+        transform.header.frame_id = 'world'
+        
+        transform.child.frame_id = name_link[i]
+        
+        transform.transform.translation.x = T[0, 3]
+        transform.transform.translation.y = T[1, 3]
+        transform.transform.translation.z = T[2, 3]
+        transform.transform.rotation = rotmat2q(T)
+        
+        br.sendTransform(transform)
+        
+    return None
     # your code ends here ------------------------------
 
 
