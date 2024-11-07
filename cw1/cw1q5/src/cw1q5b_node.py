@@ -180,7 +180,7 @@ def fkine_wrapper(joint_msg, br):
         
         transform.header.frame_id = 'base_link'
         
-        transform.child.frame_id = 'arm5b_link_'+str(i+1)
+        transform.child.frame_id = 'arm5c_link_'+str(i+1)
         
         transform.transform.translation.x = T[0, 3]
         transform.transform.translation.y = T[1, 3]
