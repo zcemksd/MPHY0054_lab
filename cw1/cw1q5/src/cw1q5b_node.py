@@ -41,7 +41,7 @@ youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
                         'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
 # Define the frame names
-name_link = ['link_1', 'link_2', 'link_3', 'link_4', 'link_5']
+name_link = ['arm5b_link_1', 'arm5b_link_2', 'arm5b_link_3', 'arm5b_link_4', 'arm5b_link_5']
 
 def rotmat2q(R):
 # Function for converting a 3x3 Rotation matrix R to quaternion conversion q
@@ -145,13 +145,9 @@ def forward_kinematics(dh_dict, joints_readings, up_to_joint=5):
     T = np.identity(4)
     
     # your code starts here ------------------------------
-    a = youbot_dh_parameters['a']
-    alpha = youbot_dh_parameters['alpha']
-    d = youbot_dh_parameters['d']
-    theta = youbot_dh_parameters['theta']
-    
+ 
     for i in range(up_to_joint):
-        T_i = standard_dh(a[i], alpha[i], d[i], theta[i] + joints_readings[i])
+        T_i = standard_dh(a = dh_dict['a'][i], alpha = dh_dict['alpha'][i], d = dh_dict['d'][i], theta = dh_dict['theta'][i] + joints_readings[i])
         T = T @ T_i
 
     # your code ends here -------------------------------
