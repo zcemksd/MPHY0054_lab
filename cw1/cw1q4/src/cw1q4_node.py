@@ -61,9 +61,9 @@ def convert_quat2zyx(request):
     response = quat2zyxResponse()
 
     # Fill in the response with the Euler angles
-    response.roll = roll
-    response.pitch = pitch
-    response.yaw = yaw
+    response.x.data = roll
+    response.y.data = pitch
+    response.z.data = yaw
 
 
     # Your code ends here ------------------------------
@@ -90,34 +90,34 @@ def convert_quat2rodrigues(request):
     # Your code starts here ----------------------------
     # Get the quaternion from quat2rodriguesRequest
     
-    qx = request.qx
-    qy = request.qy
-    qz = request.qz
-    qw = request.qw
+    qx = request.q.x
+    qy = request.q.y
+    qz = request.q.z
+    qw = request.q.w
 
     # Calculate axis of rotation 
     # Axis of rotation is the normalized vector [qx, qy, qz]
     
-    axis_mag = np.sqrt(qx * qx + qy * qy + qz * qz)
+    norm_vect = np.sqrt(qx * qx + qy * qy + qz * qz)
     
     # If the magnitude is zero, the quaternion represents no rotation, so return a zero Rodrigues vector
     
-    if axis_mag == 0:
+    if norm_vect == 0:
         response = quat2rodriguesResponse()
-        response.rx = 0.0
-        response.ry = 0.0
-        response.rz = 0.0
+        response.x.data = 0.0
+        response.y.data = 0.0
+        response.z.data = 0.0
         return response
 
     # Normalize the vector to get the direction of the axis of rotation
     
-    x = qx / axis_mag
-    y = qy / axis_mag
-    z = qz / axis_mag
+    x = qx / norm_vect
+    y = qy / norm_vect
+    z = qz / norm_vect
 
     # Calculate the rotation angle theta
     
-    theta = 2 * np.arctan2(axis_mag, qw)
+    theta = 2 * np.arctan2(norm_vect, qw)
 
     # The Rodrigues vector is the angle times the unit axis of rotation
     
@@ -128,9 +128,9 @@ def convert_quat2rodrigues(request):
     # Create a response object and store the Rodrigues vector components
     
     response = quat2rodriguesResponse()
-    response.r_x = r_x
-    response.r_y = r_y
-    response.r_z = r_z
+    response.x.data = r_x
+    response.y.data = r_y
+    response.z.data = r_z
 
     # Your code ends here ------------------------------
 
