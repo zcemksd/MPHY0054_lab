@@ -95,35 +95,36 @@ def convert_quat2rodrigues(request):
     qz = request.q.z
     qw = request.q.w
 
-    # Calculate axis of rotation 
-    # Axis of rotation is the normalized vector [qx, qy, qz]
+    # Normalise quaternion
+    norm_quat = np.sqrt(qw* qw + qx * qx + qy * qy + qz * qz)
     
-    norm_vect = np.sqrt(qx * qx + qy * qy + qz * qz)
-    
-    # If the magnitude is zero, the quaternion represents no rotation, so return a zero Rodrigues vector
-    
-    if norm_vect == 0:
-        response = quat2rodriguesResponse()
-        response.x.data = 0.0
-        response.y.data = 0.0
-        response.z.data = 0.0
-        return response
+    # If qw > 1, normalise to avoid errors 
+    if qw > 1.0:
+        qw /= norm_quat
+        qx /= norm_quat
+        qy /= norm_quat
+        qz /= norm_quat
 
-    # Normalize the vector to get the direction of the axis of rotation
-    
-    x = qx / norm_vect
-    y = qy / norm_vect
-    z = qz / norm_vect
 
     # Calculate the rotation angle theta
-    
-    theta = 2 * np.arctan2(norm_vect, qw)
+    theta = 2 * np.arccos(qw)
 
-    # The Rodrigues vector is the angle times the unit axis of rotation
-    
-    r_x = theta * x
-    r_y = theta * y
-    r_z = theta * z
+    # Calculate the magnitude of the vector of the quaternion i.e. axis of rotation
+    # Assumes w is less than 1, so it is always positive
+    rot_axis = np.sqrt(1 - qw * qw)
+
+    # Check if the axis of rotation approaches 0 to avoid dividing by zero
+    # If rot_axis is close to 0, return the quaternion components
+    # Otherwise, normalise the rotation axis to get the direction 
+    # and scale by the angle of rotation
+    if rot_axis < 1e-6:
+        r_x = qx
+        r_y = qy
+        r_z = qz
+    else:
+        r_x = (qx/rot_axis) * theta
+        r_y = (qy/rot_axis) * theta
+        r_z = (qz/rot_axis) * theta 
 
     # Create a response object and store the Rodrigues vector components
     
