@@ -34,9 +34,9 @@ def convert_quat2zyx(request):
     assert isinstance(request, quat2zyxRequest)
 
     # Your code starts here ----------------------------
+    
     # Get quaternion from quat2zyxRequest
     # Quaternions have 4 components: q_x, q_y, q_z, q_w
-    
     qx = request.q.x
     qy = request.q.y
     qz = request.q.z
@@ -45,15 +45,12 @@ def convert_quat2zyx(request):
 
     # Find Euler angles using the quaternion to Euler formula
     # X-axis rotation
-    
     roll = np.atan2(2.0 * (qw * qx + qy * qz), 1.0 - 2.0 * (qx * qx + qy * qy)) 
     
     # Y-axis rotation
-    
     pitch = np.arcsin(2.0 * (qw * qy - qz * qx))
     
     # Z-axis rotation
-    
     yaw = np.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz)) 
 
 
@@ -64,7 +61,6 @@ def convert_quat2zyx(request):
     response.x.data = roll
     response.y.data = pitch
     response.z.data = yaw
-
 
     # Your code ends here ------------------------------
 
@@ -88,8 +84,8 @@ def convert_quat2rodrigues(request):
     assert isinstance(request, quat2rodriguesRequest)
 
     # Your code starts here ----------------------------
-    # Get the quaternion from quat2rodriguesRequest
     
+    # Get the quaternion from quat2rodriguesRequest
     qx = request.q.x
     qy = request.q.y
     qz = request.q.z
@@ -127,7 +123,6 @@ def convert_quat2rodrigues(request):
         r_z = (qz/rot_axis) * theta 
 
     # Create a response object and store the Rodrigues vector components
-    
     response = quat2rodriguesResponse()
     response.x.data = r_x
     response.y.data = r_y
