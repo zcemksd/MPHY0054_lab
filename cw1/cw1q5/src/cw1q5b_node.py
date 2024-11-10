@@ -91,6 +91,8 @@ def standard_dh(a, alpha, d, theta):
     A = np.zeros((4, 4))
 
     # your code starts here -----------------------------
+
+    # Compute each element of the 4x4 matrix
     A[0, 0] = np.cos(theta)
     A[0, 1] = -np.sin(theta) * np.cos(alpha)
     A[0, 2] = np.sin(theta) * np.sin(alpha)
@@ -143,6 +145,7 @@ def forward_kinematics(dh_dict, joints_readings, up_to_joint=5):
     
     # your code starts here ------------------------------
  
+    # Calculate the position of the end effector with reference to frame 0
     for i in range(up_to_joint):
         T_i = standard_dh(dh_dict['a'][i], dh_dict['alpha'][i], dh_dict['d'][i], dh_dict['theta'][i] + joints_readings[i])
         T = T @ T_i
@@ -172,25 +175,33 @@ def fkine_wrapper(joint_msg, br):
     assert isinstance(joint_msg, JointState), "Node must subscribe to a topic where JointState messages are published"
     # your code starts here ------------------------------
     
+    # Naming the links
     name_link = ['arm5b_link_1', 'arm5b_link_2', 'arm5b_link_3', 'arm5b_link_4', 'arm5b_link_5']
 
+    # Callback function
     transform = TransformStamped()
     rospy.loginfo("Received joint state update")
 
+    # Iterate through all joints: calculate forward kinematics of every joint
     for i in range(5):
         T = forward_kinematics(youbot_dh_parameters, list(joint_msg.position), i+1)
 
+        # Define transform timestamp
         transform.header.stamp = rospy.Time.now()
         
+        # Define transform parent frame
         transform.header.frame_id = 'base_link'
         
+        # Define transform child frame
         transform.child.frame_id = name_link[i]
         
+        # Populate transform field 
         transform.transform.translation.x = T[0, 3]
         transform.transform.translation.y = T[1, 3]
         transform.transform.translation.z = T[2, 3]
         transform.transform.rotation = rotmat2q(T)
         
+        # Broadcast the transform to tf2
         br.sendTransform(transform)
         
     # your code ends here ------------------------------
