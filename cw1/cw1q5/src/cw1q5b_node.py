@@ -35,9 +35,9 @@ see all the frames stacked in the z axis (the home position).
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5a.
 
 
-youbot_dh_parameters = {'a':[0.0, 0.155, 0.135, 0.113, 0.0],
-                        'alpha': [np.pi/2, -np.pi/2, 0.0, 0.0, -np.pi/2],
-                        'd' : [0.147, 0.0, 0.0, 0.0, 0.105],
+youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
+                        'alpha': [0.0, np.pi/2, 0.0, 0.0, -np.pi/2],
+                        'd' : [0.036, 0.0, 0.0, 0.0, 0.113],
                         'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
 def rotmat2q(R):
