@@ -4,7 +4,7 @@ import rospy
 import numpy as np
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
-from cw1q5b_node import forward_kinematics
+from cw1q5b_node import forward_kinematics, rotmat2q
 from geometry_msgs.msg import TransformStamped, Quaternion # students need to add this
 
 """
@@ -116,6 +116,41 @@ def fkine_wrapper(joint_msg, br):
         
     # your code ends here ------------------------------
 
+    # Set transform class according to the tf2 format
+    transform = TransformStamped
+
+    # Link name definitons
+    link_i = ['arm5d_link_1', 'arm5d_link_2', 'arm5d_link_3', 'arm5d_link_4', 'arm5d_link_5']
+
+    # Read the joint position from the joint_msg.position slider GUI
+    joint_msg.position = list(joint_msg.position)
+
+    # Sign change of the message position based on a reading from the polarity list
+    for j in range(5):
+        joint_msg.position[j] = youbot_joint_readings_polarity[j]*joint_msg.position[j]
+
+    # Transformation with tf2 from base to each joint
+    for i in range(5):
+        T = forward_kinematics(youbot_dh_offset_paramters, joint_msg.position, i+1)
+
+        # Define transform timestamp
+        transform.header.stamp = rospy.Time.now()
+
+        # Define transform parent frame
+        transform.header.frame_id = 'base_link'
+
+        # Define transform child frame
+        transform.child_frame_id = link_i[i]
+
+        # Populate the transform field
+        transform.transform.translation.x = T[0,3]
+        transform.transform.translation.y = T[1,3]
+        transform.transform.translation.z = T[2,3]
+        transform.transform.rotation = rotmat2q(T)
+
+
+        # Broadcast transform to tf2 
+        br.sendTransform(transform)
 
 
 
@@ -129,6 +164,8 @@ def main():
     # as callback and pass the broadcaster as an additional argument to the callback
     
     # your code starts here ------------------------------
+
+    subscriber = rospy.Subscriber('/joint_states', JointState, fkine_wrapper, br)
 
     # your code ends here ----------------------
     
