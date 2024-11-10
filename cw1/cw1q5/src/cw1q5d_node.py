@@ -47,13 +47,13 @@ fall on the exact joint positions of the Youbot.
 
 
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5c.
-youbot_dh_parameters = {'a':[, , , , ],
-                        'alpha': [, , , , ],
-                        'd' : [, , , , ],
-                        'theta' : [, , , , ]}
+youbot_dh_parameters = {'a':[0.024, 0.033, 0.0, 0.0, -0.002],
+                        'alpha': [0.0, np.deg2rad(-65), np.deg2rad(146), np.deg2rad(-102.5), 0.0],
+                        'd' : [0.096, 0.019, 0.155, 0.135, 0.130],
+                        'theta' : [0, 0, 0, 0, 0]}  # type: ignore
 
 # TODO: populate the values inside the youbot_joint_offsets dictionary with the ones you found in question 5c.
-youbot_joint_offsets = [, , , , ]
+youbot_joint_offsets = [np.deg2rad(170), 0, 0, 0, np.deg2rad(167.5)]
 
 youbot_dh_offset_paramters = youbot_dh_parameters.copy()
 
@@ -165,7 +165,7 @@ def main():
     
     # your code starts here ------------------------------
 
-    subscriber = rospy.Subscriber('/joint_states', JointState, fkine_wrapper, br)
+    sub = rospy.Subscriber('/joint_states', JointState, fkine_wrapper, br)
 
     # your code ends here ----------------------
     
