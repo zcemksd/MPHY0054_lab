@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import rospy
-from math import pi
 import numpy as np
+from numpy import pi
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
 from tf2_ros import TransformBroadcaster
@@ -35,9 +35,9 @@ see all the frames stacked in the z axis (the home position).
 # TODO: populate the values inside the youbot_dh_parameters dictionary with the ones you found in question 5a.
 
 
-youbot_dh_parameters = {'a':[0.0, 0.0, 0.155, 0.135, 0.0],
-                        'alpha': [0.0, pi/2, 0.0, 0, -pi/2],
-                        'd' : [0.036, 0.111, 0.0, 0.0, 0.113],
+youbot_dh_parameters = {'a':[0.0, 0.155, 0.135, 0.113, 0.0],
+                        'alpha': [np.pi/2, -np.pi/2, 0.0, 0.0, -np.pi/2],
+                        'd' : [0.147, 0.0, 0.0, 0.0, 0.105],
                         'theta' : [0.0, 0.0, 0.0, 0.0, 0.0]}
 
 def rotmat2q(R):
@@ -144,7 +144,7 @@ def forward_kinematics(dh_dict, joints_readings, up_to_joint=5):
     # your code starts here ------------------------------
  
     for i in range(up_to_joint):
-        T_i = standard_dh(a = dh_dict['a'][i], alpha = dh_dict['alpha'][i], d = dh_dict['d'][i], theta = dh_dict['theta'][i] + joints_readings[i])
+        T_i = standard_dh(dh_dict['a'][i], dh_dict['alpha'][i], dh_dict['d'][i], dh_dict['theta'][i] + joints_readings[i])
         T = T @ T_i
 
     # your code ends here -------------------------------
@@ -172,7 +172,11 @@ def fkine_wrapper(joint_msg, br):
     assert isinstance(joint_msg, JointState), "Node must subscribe to a topic where JointState messages are published"
     # your code starts here ------------------------------
     
+    name_link = ['arm5b_link_1', 'arm5b_link_2', 'arm5b_link_3', 'arm5b_link_4', 'arm5b_link_5']
+
     transform = TransformStamped()
+    rospy.loginfo("Received joint state update")
+
     for i in range(5):
         T = forward_kinematics(youbot_dh_parameters, list(joint_msg.position), i+1)
 
@@ -180,7 +184,7 @@ def fkine_wrapper(joint_msg, br):
         
         transform.header.frame_id = 'base_link'
         
-        transform.child.frame_id = 'arm5c_link_'+str(i+1)
+        transform.child.frame_id = name_link[i]
         
         transform.transform.translation.x = T[0, 3]
         transform.transform.translation.y = T[1, 3]
