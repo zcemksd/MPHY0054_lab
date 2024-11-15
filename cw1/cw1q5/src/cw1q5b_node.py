@@ -193,7 +193,7 @@ def fkine_wrapper(joint_msg, br):
         transform.header.frame_id = 'base_link'
         
         # Define transform child frame
-        transform.child.frame_id = name_link[i]
+        transform.child_frame_id = name_link[i]
         
         # Populate transform field 
         transform.transform.translation.x = T[0, 3]
@@ -221,7 +221,7 @@ def main():
     
     # your code starts here ------------------------------
   
-    sub = rospy.Subscriber('/joint_States', JointState, fkine_wrapper, br)
+    sub = rospy.Subscriber('joint_states', JointState, fkine_wrapper, br)
 
     # your code ends here ----------------------
     
