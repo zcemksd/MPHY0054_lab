@@ -8,7 +8,6 @@ from kdl_parser_py.urdf import treeFromUrdfModel
 from urdf_parser_py.urdf import URDF
 import rospkg
 
-
 class YoubotKinematicKDL(YoubotKinematicBase):
     def __init__(self, tf_suffix='kdl'):
         super(YoubotKinematicKDL, self).__init__(tf_suffix)
