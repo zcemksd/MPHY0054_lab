@@ -84,6 +84,24 @@ class YoubotTrajectoryPlanning(object):
 
         # Your code starts here ------------------------------
 
+        i = 1
+        for topic, msg, t in bag.read_messages(topics=['joint_data']):
+
+            # Extract joint positions from current message 
+            # Populate all joint values for the i-th checkpoint
+            target_joint_positions[i, :] = msg.position
+
+            # Pass joint positions to compute T matrix for end-effector position
+            target_cart_tf[:, :, i] = self.kdl_youbot.forward_kinematics(target_joint_positions[i, :])
+
+            # Increments index to process next checkpoint 
+            i += 1
+
+            # Check if 5 checkpoints have been processed
+            # Exit loop if 5 or more checkpoints are processed
+            if i >= 5:
+                break
+
         # Your code ends here ------------------------------
 
         # Close the bag
