@@ -5,6 +5,7 @@ import rosbag
 import rospkg
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from cw2q4.youbotKineKDL import YoubotKinematicKDL
+from itertools import permutations
 
 import PyKDL
 from visualization_msgs.msg import Marker
@@ -126,6 +127,51 @@ class YoubotTrajectoryPlanning(object):
         """
 
         # Your code starts here ------------------------------
+
+        # Extract each checkpoint position from the transformation matrices
+        # There are 5 checkpoints
+        num_checkpoints = checkpoints_tf.shape[2]
+
+        # Create a list to store checkpoint Cartesian positions
+        positions = []
+
+        # i takes values 0 to 4 (5 checkpoints)
+        # Extracted positions for each checkpoint are added to positions list
+        for i in range(num_checkpoints):
+            position = checkpoints_tf[:3, 3, i]
+            positions.append(position)
+        positions = np.array(positions)
+
+        # Track shortest path by starting with an infinitely large distance
+        min_dist = float('inf')
+
+        # Store best checkpoint order
+        sorted_order = None
+
+        # Generate all permutations or possible orders of checkpoint indices
+        all_orders = permutations(range(1, num_checkpoints))
+
+        # Evaluate each order to find the shortest path
+        # Starting point 0 added at the beginning
+        # Track total distance for the current path
+        for order in all_orders:
+            current_order = [0] + list(order)
+            current_distance = 0
+
+            # Calculate total distance for the current order
+            # Use sum of Euclidean distances between consecutive positions
+            for j in range(len(current_order) - 1):
+                start = positions[current_order[j]]
+                end = positions[current_order[j + 1]]
+                distance = np.linalg.norm(start - end)
+                current_distance += distance
+
+            # Update minimum distance and best order if current path is better
+            # Convert the best order to a numpy array 
+            if current_distance < min_dist:
+                min_dist = current_distance
+                sorted_order = np.array(current_order)
+
 
         # Your code ends here ------------------------------
 
