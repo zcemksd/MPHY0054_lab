@@ -222,6 +222,29 @@ class YoubotTrajectoryPlanning(object):
         """
 
         # Your code starts here ------------------------------
+
+        # List to store all intermediate transformation matrices
+        all_transforms = []
+        
+        # Loop through each pair of consecutive checkpoints to:
+        # 1. get the index of the current and next checkpoints from the list
+        # 2. extract the transformation matrices for the two checkpoints
+        # 3. generate intermediate transformations between the checkpoints
+        # 4. add the intermediate matrices to the list
+        for i in range(len(sorted_checkpoint_idx) - 1):
+            start_idx = sorted_checkpoint_idx[i]
+            end_idx = sorted_checkpoint_idx[i + 1]
+            start_tf = target_checkpoint_tfs[:, :, start_idx]
+            end_tf = target_checkpoint_tfs[:, :, end_idx]
+
+            # Create intermediate transformations
+            intermediate_transforms = self.decoupled_rot_and_trans(start_tf, end_tf, num_points)
+
+            # Add intermediate transformations to the list
+            all_transforms.append(intermediate_transforms)
+
+        # Combine all intermediate transformations in an array
+        full_checkpoint_tfs = np.concatenate(all_transforms, axis=2)
         
         # Your code ends here ------------------------------
        
@@ -240,6 +263,46 @@ class YoubotTrajectoryPlanning(object):
         """
 
         # Your code starts here ------------------------------
+
+        # Initialise an array to store intermediate transformation matrices
+        # 4x4
+        tfs = np.zeros(4,4, num_points)
+
+        # Extract rotation and translation components from the 4x4 matrices
+        # Rotation matrix of the starting pose
+        start_rot = PyKDL.Rotation(checkpoint_a_tf[:3, :3])
+
+        # Rotation matrix of the ending pose
+        end_rot = PyKDL.Rotation(checkpoint_b_tf[:3, :3])
+
+        # Translation vector of the starting pose
+        start_position = checkpoint_a_tf[:3, 3]
+
+        # Translation vector of the ending pose
+        end_position = checkpoint_b_tf[:3, 3]
+
+        # Calculate intermediate transformations by:
+        # 1. finding the interpolation factor alpha between 0 and 1 (starting and ending pose)
+        # 2. computing the position fo the current intermediate step
+        # 3. calculating the intermediate rotation
+        # 4. building the homogenous 4x4 transformation matrix
+        for step in range(num_points):
+            alpha = step / (num_points -1)
+
+            # Position of current intermediate step
+            interpolated_position = (1 - alpha) * start_position + alpha * end_position
+
+            # Calculate intermediate rotation
+            interpolated_rotation = start_rot.Interpolate(end_rot, alpha)
+
+            # Top-left 3x3 of the matrix: interpolated rotation
+            tfs[:3, :3, step] = interpolated_rotation
+
+            # Last column of the 4x4 matrix: translation vector 3x1
+            tfs[:3, 3, step] = interpolated_position
+
+            # Bottom row of the 4x4 matrix: [0, 0, 0, 1] 
+            tfs[3, :, step] = [0, 0, 0, 1]
 
         # Your code ends here ------------------------------
 
