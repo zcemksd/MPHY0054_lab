@@ -321,10 +321,21 @@ class YoubotTrajectoryPlanning(object):
         """
         
         # Your code starts here ------------------------------
+        num_checkpoints = full_checkpoint_tfs.shape[2]
+        q_checkpoints = np.zeros(5, num_checkpoints)
+
+        current_joint_positions = init_joint_position.copy()
+
+        for i in range(num_checkpoints):
+            current_checkpoint_pose = full_checkpoint_tfs[:, :, i]
+            q, error = self.ik_position_only(current_checkpoint_pose, current_joint_positions)
+            q_checkpoints[:, i] = q.flatten()
+
+            current_joint_positions = q.copy() 
 
         # Your code ends here ------------------------------
 
-        return q_checkpoints
+        return q_checkpoints 
 
     def ik_position_only(self, pose, q0):
         """This function implements position only inverse kinematics.
@@ -340,7 +351,29 @@ class YoubotTrajectoryPlanning(object):
         # Jacobian that will affect the position of the error.
 
         # Your code starts here ------------------------------
-        
+        max_iterations = 100
+        error_tolerance = 1e-3
+        q = q0.copy()
+
+        target_position = pose[:3, 3]
+
+        for i in range(max_iterations):
+            current_pose = self.kdl_youbot.forward_kinematics(q)
+            current_position = current_pose[:3, 3]
+
+            position_difference = target_position - current_position
+            error = np.linalg.norm(position_difference)
+
+            if error < error_tolerance:
+                break
+
+            full_jacobian = self.kdl_youbot.get_jacobian(q)
+            position_jacobian = full_jacobian[:3, :]
+
+            jacobian_pseudo_inverse = np.linalg.pinv(position_jacobian)
+
+            delta_joint_positions = jacobian_pseudo_inverse @ position_difference
+            q += delta_joint_positions
         # Your code ends here ------------------------------
 
         return q, error
