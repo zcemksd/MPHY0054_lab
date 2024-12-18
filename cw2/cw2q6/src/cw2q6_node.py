@@ -53,6 +53,34 @@ class YoubotTrajectoryPlanning(object):
 
         # Your code starts here ------------------------------
 
+        # Load in targets from bagfile
+        target_cart_tf, target_joint_positions = self.load_targets()
+
+        # Compute shorterst path visting eah checkpoint position
+        sorted_order, _ = self.get_shortest_path(target_cart_tf)
+
+        # Determine intermediate checkpoints to achieve a linear path between each checkpoint
+        # Generate intermediate transformations alonge the sorted path with 10 points per segment
+        intermediate_tfs = self.intermediate_tfs(sorted_order, target_cart_tf, num_points=10)
+
+        # Publish checkpoints for visualisation
+        self.publish_traj_tfs(intermediate_tfs)
+
+        # Convert all checkpoints into joint values using IK solver
+        init_joint_position = target_joint_positions[:, 0]
+        joint_positions = self.full_checkpoints_to_joints(intermediate_tfs, init_joint_position)
+
+        traj = JointTrajectory()
+        for i in range(joint_positions.shape[1]):
+            point = JointTrajectory()
+
+            # Joint positions for current step
+            point.positions = joint_positions[:, i]
+
+            # Increment time step by 0.1 sec for each point
+            point.time_from_start = rospy.Duration(i * 0.1)
+            traj.points.append(point)
+
         # Your code ends here ------------------------------
 
         assert isinstance(traj, JointTrajectory)
@@ -321,16 +349,26 @@ class YoubotTrajectoryPlanning(object):
         """
         
         # Your code starts here ------------------------------
+
+        # Number of checkpoints
         num_checkpoints = full_checkpoint_tfs.shape[2]
+
+        # Matrix to store joint positions
         q_checkpoints = np.zeros(5, num_checkpoints)
 
+        # Initial joint position
         current_joint_positions = init_joint_position.copy()
 
         for i in range(num_checkpoints):
             current_checkpoint_pose = full_checkpoint_tfs[:, :, i]
+
+            # Solve inverse kinematics for the current pose using position-only IK
             q, error = self.ik_position_only(current_checkpoint_pose, current_joint_positions)
+
+            # Store solution in joint positions matrix
             q_checkpoints[:, i] = q.flatten()
 
+            # Update initial guess for next checkpoint to current solution
             current_joint_positions = q.copy() 
 
         # Your code ends here ------------------------------
@@ -351,29 +389,43 @@ class YoubotTrajectoryPlanning(object):
         # Jacobian that will affect the position of the error.
 
         # Your code starts here ------------------------------
+
+        # Maximum number of iterations
         max_iterations = 100
+
+        # Positioni error threshold to stop iteration
         error_tolerance = 1e-3
+
+        # Initialise joint positions with the initial guess
         q = q0.copy()
 
+        # Get target position from the pose matrix
         target_position = pose[:3, 3]
 
         for i in range(max_iterations):
+            # FK to get current end-effector position
             current_pose = self.kdl_youbot.forward_kinematics(q)
             current_position = current_pose[:3, 3]
 
+            # Find position error
             position_difference = target_position - current_position
             error = np.linalg.norm(position_difference)
 
+            # Error should be above set threshold
             if error < error_tolerance:
                 break
-
+            
+            # Calculate Jacobian matrix 
             full_jacobian = self.kdl_youbot.get_jacobian(q)
             position_jacobian = full_jacobian[:3, :]
 
+            # Compute pseudo-inverse of the position Jacobian
             jacobian_pseudo_inverse = np.linalg.pinv(position_jacobian)
 
+            # Newton-Raphson method for updating the joint positions 
             delta_joint_positions = jacobian_pseudo_inverse @ position_difference
             q += delta_joint_positions
+
         # Your code ends here ------------------------------
 
         return q, error
