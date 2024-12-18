@@ -294,7 +294,7 @@ class YoubotTrajectoryPlanning(object):
 
         # Initialise an array to store intermediate transformation matrices
         # 4x4
-        tfs = np.zeros(4,4, num_points)
+        tfs = np.zeros((4,4, num_points))
 
         # Extract rotation and translation components from the 4x4 matrices
         # Rotation matrix of the starting pose
@@ -354,7 +354,7 @@ class YoubotTrajectoryPlanning(object):
         num_checkpoints = full_checkpoint_tfs.shape[2]
 
         # Matrix to store joint positions
-        q_checkpoints = np.zeros(5, num_checkpoints)
+        q_checkpoints = np.zeros((5, num_checkpoints))
 
         # Initial joint position
         current_joint_positions = init_joint_position.copy()
