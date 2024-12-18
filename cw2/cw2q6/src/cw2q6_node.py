@@ -56,11 +56,11 @@ class YoubotTrajectoryPlanning(object):
         # Load in targets from bagfile
         target_cart_tf, target_joint_positions = self.load_targets()
 
-        # Compute shorterst path visting eah checkpoint position
+        # Compute shortest path visting each checkpoint position
         sorted_order, _ = self.get_shortest_path(target_cart_tf)
 
         # Determine intermediate checkpoints to achieve a linear path between each checkpoint
-        # Generate intermediate transformations alonge the sorted path with 10 points per segment
+        # Generate intermediate transformations along the sorted path with 10 points per segment
         intermediate_tfs = self.intermediate_tfs(sorted_order, target_cart_tf, num_points=10)
 
         # Publish checkpoints for visualisation
@@ -72,7 +72,7 @@ class YoubotTrajectoryPlanning(object):
 
         traj = JointTrajectory()
         for i in range(joint_positions.shape[1]):
-            point = JointTrajectory()
+            point = JointTrajectoryPoint()
 
             # Joint positions for current step
             point.positions = joint_positions[:, i]
