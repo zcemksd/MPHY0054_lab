@@ -86,7 +86,12 @@ class YoubotKinematicStudent(YoubotKinematicBase):
         p_ee = T_0_n[:3, 3]
 
         # Initialise variables for the previous transformation matrix
-        T_0_i = np.identity(4) # Indentity matrix for base frame
+        # Indentity matrix for base frame
+        T_0_i = np.identity(4) 
+
+        # Conventions to match KDL Jacobian assuming the URDF convention
+        z_0 = np.array([0, 0, -1])
+        p_0 = np.array([0, 0, 0]) 
 
         for i in range(5):
             A_i = self.standard_dh(self.dh_params['a'][i],
@@ -104,10 +109,13 @@ class YoubotKinematicStudent(YoubotKinematicBase):
             p_i = T_0_i[:3, 3]
 
             # Compute the linear velocity of the Jacobian by the cross product
-            jacobian[:3, i] = np.cross(z_i, (p_ee - p_i))
+            jacobian[:3, i] = np.cross(z_0, (p_ee - p_0))
 
             # Compute the angular velocity of the Jacobian from the rotation axis
-            jacobian[3:, i] = z_i
+            jacobian[3:, i] = z_0
+
+            # Update for next iteration
+            z_0, p_0 = z_i, p_i 
 
 
         # Your code ends here ------------------------------
