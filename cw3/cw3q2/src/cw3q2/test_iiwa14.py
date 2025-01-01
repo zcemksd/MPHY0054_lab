@@ -1,13 +1,27 @@
 #!/usr/bin/env python3
+print("Script started")
+try:
+    print("Importing numpy...")
+    import numpy as np 
+    print("Numpy imported successfully...")
 
-import numpy as np 
-from cw3q2.iiwa14DynStudent import Iiwa14DynamicRef as Student
-from cw3q2.iiwa14DynKDL import Iiwa14DynamicKDL as KDL
+    print("Importing Student class...")
+    from cw3q2.iiwa14DynStudent import Iiwa14DynamicRef as Student
+    print("Student class imported successfully...")
+
+    print("Importing KDL class...")
+    from cw3q2.iiwa14DynKDL import Iiwa14DynamicKDL as KDL
+    print("KDL class imported successfully...")
+    
+except Exception as e:
+    print("An error occurred during imports:", e)
 
 def compare_matrices(mat1, mat2, tol=1e-6):
+    print("Comparing matrices...")
     return np.allclose(mat1, mat2, atol=tol)
 
 def main():
+    print("Main function started")
     try: 
         print("Starting comparison...")
         student = Student()
@@ -40,4 +54,3 @@ def main():
 
     if __name__ == "__main__":
         main()
-        
