@@ -79,10 +79,10 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
 
         # Compute Jacobian columns for each joint    
         for i in range(up_to_joint): 
-            # Linear velocity contribution
+            # Vector from joint to end-effection
             p = p_com[up_to_joint - 1] - p_com[i]
 
-            # Vector from joint to end-effection
+            # Linear velocity contribution
             jacobian[:3, i] = np.cross(z_axes[i], p)
 
             # Angular velocity contribution
@@ -130,14 +130,14 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
             # Compute Jacobian for the centre of mass of link i
             J_com = self.get_jacobian_centre_of_mass(joint_readings, up_to_joint=i + 1)
 
-            # Extract linear and anglular components of the Jacobian 
+            # Extract linear and angular components of the Jacobian 
             J_v = J_com[:3, :]
             J_w = J_com[3:, :]
 
             # Compute inertia contribution for link i
             # Mass of link i
             m_i = self.mass[i] 
-            # Inertia tensor of link i in its local frame
+            # Inertia tensor in local frame
             I_i = np.diag(self.Ixyz[i])
 
             # Contribution to B from linear and angular terms
@@ -151,10 +151,18 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
     def get_B_derivative(self, i, j, k, joint_readings):
         """
         Compute derivative of inertia matrix element B_ij with respect to q_k.
+
+        Args:
+            i, j, k (int): Indices for matrix elements and joint variables.
+            joint_Readings (list): The state of the robot joints.
+
+        Returns:
+            float: Derivative of B_ij with respect to q_k.
         """
 
         delta_qk = np.zeros(7)
         delta_qk[k] = 1e-6
+
         B_plus_delta_qk = self.get_B((np.array(joint_readings) + delta_qk).tolist())
         B_minus_delta_qk = self.get_B((np.array(joint_readings) - delta_qk).tolist())
 
@@ -179,17 +187,17 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         # Initialise Coriolis terms
         C = np.zeros(7)
 
-        # Compute partial derivatives of the inertia matrix B
-        B = self.get_B(joint_readings)
-
         for k in range(7):
             for i in range(7):
                 for j in range(7):
                     # Christoffel symbols of the first kind
-                    c_ijk = 0.5 * (self.get_B_derivative(i, j, k, joint_readings) + self.get_B_derivative(i, j, k, joint_readings) - self.get_B_derivative(j, k, i, joint_readings))
-                
-                # Compute Coriolis term
-                C[k] += c_ijk * joint_velocities[j] * joint_velocities[k]
+                    c_ijk = 0.5 * (
+                        self.get_B_derivative(i, j, k, joint_readings) + 
+                        self.get_B_derivative(i, j, k, joint_readings) - 
+                        self.get_B_derivative(j, k, i, joint_readings)
+                        )
+                    # Compute Coriolis term
+                    C[k] += c_ijk * joint_velocities[j] * joint_velocities[k]
 
         # Your code ends here ------------------------------
 
