@@ -60,6 +60,33 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
 
         # Your code starts here ----------------------------
 
+        # Initialise the Jacobian matrix
+        jacobian = np.zeros((6, 7))
+
+        # Compute transformation matrices for the center of mass
+        T_base_com = [self.forward_kinematics_centre_of_mass(joint_readings, j + 1) for j in range(up_to_joint)]
+
+        # Compute the position of each center of mass
+        p_com = [T[:3, 3] for T in T_base_com]
+
+        # z-axis of base frame
+        z_axes = [np.array([0, 0, 1])]
+
+        # Compute z-axis of each joint frame in the base frame
+        for j in range(up_to_joint - 1):
+            T = self.forward_kinematics(joint_readings, j + 1)
+            z_axes.append(T[:3, 2])
+
+        # Compute Jacobian columns for each joint    
+        for i in range(up_to_joint): 
+            # Linear velocity contribution
+            p = p_com[up_to_joint - 1] - p_com[i]
+
+            # Vector from joint to end-effection
+            jacobian[:3, i] = np.cross(z_axes[i], p)
+
+            # Angular velocity contribution
+            jacobian[3:, i] = z_axes[i]
 
         # Your code ends here ------------------------------
 
@@ -96,12 +123,42 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         """
         B = np.zeros((7, 7))
         
-	# Your code starts here ------------------------------
+        # Your code starts here ------------------------------
 
-        
+        # Calculate contributions of each joint to the intertia matrix
+        for i in range(7):
+            # Compute Jacobian for the centre of mass of link i
+            J_com = self.get_jacobian_centre_of_mass(joint_readings, up_to_joint=i + 1)
+
+            # Extract linear and anglular components of the Jacobian 
+            J_v = J_com[:3, :]
+            J_w = J_com[3:, :]
+
+            # Compute inertia contribution for link i
+            # Mass of link i
+            m_i = self.mass[i] 
+            # Inertia tensor of link i in its local frame
+            I_i = np.diag(self.Ixyz[i])
+
+            # Contribution to B from linear and angular terms
+            B += m_i * (J_v.T @ J_v) + (J_w.T @ I_i @ J_w)
+
+
         # Your code ends here ------------------------------
         
-	return B
+        return B
+    
+    def get_B_derivative(self, i, j, k, joint_readings):
+        """
+        Compute derivative of inertia matrix element B_ij with respect to q_k.
+        """
+
+        delta_qk = np.zeros(7)
+        delta_qk[k] = 1e-6
+        B_plus_delta_qk = self.get_B((np.array(joint_readings) + delta_qk).tolist())
+        B_minus_delta_qk = self.get_B((np.array(joint_readings) - delta_qk).tolist())
+
+        return (B_plus_delta_qk[i, j] - B_minus_delta_qk[i, j]) / (2 * 1e-6)
 
     def get_C_times_qdot(self, joint_readings, joint_velocities):
         """Given the joint positions and velocities of the robot, compute Coriolis terms C.
@@ -118,7 +175,21 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_velocities) == 7
 
         # Your code starts here ------------------------------
-        
+
+        # Initialise Coriolis terms
+        C = np.zeros(7)
+
+        # Compute partial derivatives of the inertia matrix B
+        B = self.get_B(joint_readings)
+
+        for k in range(7):
+            for i in range(7):
+                for j in range(7):
+                    # Christoffel symbols of the first kind
+                    c_ijk = 0.5 * (self.get_B_derivative(i, j, k, joint_readings) + self.get_B_derivative(i, j, k, joint_readings) - self.get_B_derivative(j, k, i, joint_readings))
+                
+                # Compute Coriolis term
+                C[k] += c_ijk * joint_velocities[j] * joint_velocities[k]
 
         # Your code ends here ------------------------------
 
@@ -139,6 +210,26 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
 
         # Your code starts here ------------------------------
 
+        # Initialise gravity vector
+        g = np.zeros(7)
+
+        # Gravity acceleration vector in base frame
+        gravity = np.array([0, 0, -self.g])
+
+        # Compute the transformation matrix to the center of mass of link i
+        for i in range(7):
+            T_com = self.forward_kinematics_centre_of_mass(joint_readings, up_to_joint=i + 1)
+
+            # Extract position of the centre of mass in the base frame
+            p_com = T_com[:3, 3]
+
+            # Compute the gravity force activing on the centre of mass 
+            F_g = self.mass[i] * gravity 
+
+            # Compute the torque due to gravity at joint i
+            z_axis = self.forward_kinematics(joint_readings, up_to_joint=i)[:3, 2]
+            torque = np.cross(p_com, F_g)
+            g[i] = np.dot(z_axis, torque)
 
         # Your code ends here ------------------------------
 
