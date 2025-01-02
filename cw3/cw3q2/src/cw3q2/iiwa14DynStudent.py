@@ -59,19 +59,25 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_readings) == 7
 
         # Your code starts here ----------------------------
-        # T07 * ROT * TRANS 
-        jacobian = np.zeros((6,7)) #INitialise the jacobian
-        T0Gi = self.forward_kinematics_centre_of_mass(joint_readings, up_to_joint)
-        p   = T0Gi[0:3,3]
+
+        # Initialise Jacobian matrix
+        jacobian = np.zeros((6, 7)) 
+
+        # Transformation matrix to the centre of mass
+        T0_com = self.forward_kinematics_centre_of_mass(joint_readings, up_to_joint)
+        p_com = T0_com[:3, 3]
+
+        # Compute Jacobian columns for each joint
         T = []
         for i in range(up_to_joint):
             T.append(self.forward_kinematics(joint_readings, i))
-            Tr = T[i]
-            z_prev = Tr[0:3,2]
-            p_prev = Tr[0:3,3]
+            T_prev = T[i]
+            # z-axis of previous join
+            z_axis = T_prev[:3, 2]
+            p_prev = T_prev[:3, 3]
 
-            jacobian[0:3,i] = np.cross(z_prev, (p - p_prev))
-            jacobian[3:6, i] = z_prev
+            jacobian[:3,i] = np.cross(z_axis, (p_com - p_prev))
+            jacobian[3:6, i] = z_axis
         
         # Your code ends here ------------------------------
 
@@ -109,25 +115,27 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         B = np.zeros((7, 7))
         
 	    # Your code starts here ------------------------------
-        #Lecture 9slide 16
        
-        for i in range(1,8): 
-            #i+1
-            #Get transformation R from T
-            R0G = self.forward_kinematics_centre_of_mass(joint_readings, i)[0:3, 0:3]
-            
-            Ioli = np.zeros((3,3))
-            for j in range(3):
-                Ioli[j,j] = self.Ixyz[i-1, j]
-            Ioli = np.matmul(np.matmul(R0G,Ioli),R0G.T)
+        for i in range(1, 8): 
+            # Compute rotation matrix to the centre of mass
+            R0_com = self.forward_kinematics_centre_of_mass(joint_readings, i)[:3, :3]
 
-            mli = self.mass[i - 1]
-            Jcm = self.get_jacobian_centre_of_mass(joint_readings, i)
-            Jpli = Jcm[0:3, :]
-            Joli = Jcm[3:6, :]
-        
-            
-            B += mli * np.matmul(Jpli.T , Jpli) + np.matmul(np.matmul(Joli.T,Ioli),  Joli)
+            # Compute link inertia in global frame
+            B_loc = np.diag(self.Ixyz[i - 1, :])
+            B_glob = R0_com @ B_loc @ R0_com.T
+
+            # Compute Jacobian at the centre of mass 
+            J_com = self.get_jacobian_centre_of_mass(joint_readings, i)
+
+            # Linear component of Jacobian
+            J_v = J_com[:3, :]
+
+            # Angular component of Jacobian
+            J_w = J_com[3:6, :]
+
+            # Add link's contribution to inertia matrix B
+            mass_link = self.mass[i - 1]
+            B += (mass_link * (J_v.T @ J_v) + (J_w.T @ B_glob @ J_w))
             
         # Your code ends here ------------------------------
         
@@ -148,29 +156,34 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_velocities) == 7
 
         # Your code starts here ------------------------------
-        #L9S19
-        # C = h_ijk qdot_k
+
+        # Retrieve inertia matrix B for the given joint positions
         B = self.get_B(joint_readings)
         C = np.zeros((7,7))
-        
-        delta = 0.001 # small delta to approximate pde well
+
+        # Small step for numerical derivatives
+        delta = 1e-3
+
+        # Compute the Coriolis terms
         for i in range(7):
             for j in range(7):
                 for k in range(7):
-                    q_k_copy = np.copy(joint_readings)
-                    q_k_copy[k] += delta
-                    bij = self.get_B(q_k_copy.tolist() ) # do this sum elementwise!
+                    # Perturb the joint positions for the kth joint
+                    p_k = np.copy(joint_readings)
+                    p_k[k] += delta
+                    B_ij = self.get_B(p_k.tolist() )
 
-                    q_i_copy = np.copy(joint_readings)
-                    q_i_copy[i] += delta
-                    bjk = self.get_B(q_i_copy.tolist() )
+                    # Perturb the joint positions for the ith joint
+                    p_i = np.copy(joint_readings)
+                    p_i[i] += delta
+                    B_jk = self.get_B((p_i).tolist())
                     
-                    dbij_dq = (bij[i,j] - B[i,j]) / delta
-                    dbjk_dq = (bjk[j,k] - B[j,k]) / delta
+                    # Approximate partial derivatives
+                    d_B_ij_dq_k = (B_ij[i,j] - B[i,j]) / delta
+                    d_B_jk_dq_i = (B_jk[j,k] - B[j,k]) / delta
                     
-                    C[i,j] += (dbij_dq - 0.5 * dbjk_dq) * joint_velocities[k]
-                    #sum_j (sum_k(h_ijk *q_dot_k *q_dot_j))     
-                    #print(str(type(C)))  
+                    # Compute the Coriolis term for the current indices
+                    C[i,j] += (d_B_ij_dq_k - 0.5 * d_B_jk_dq_i) * joint_velocities[k]
                                 
         C = np.matmul(C, np.array(joint_velocities))
         
@@ -193,19 +206,27 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_readings) == 7
         
         # Your code starts here ------------------------------
-        #l9s17
+        
+        # Gravity matrix of zeros
         G = np.zeros((7,))
-        g = [0,0,self.g]
-        g = np.array(g)
-        delta = 0.001
+
+        # Gravity vector in the robot's base frame
+        g = np.array([0, 0, self.g])
+
+        # Compute the gravity terms of each joint
         for i in range(7):
             G_i = 0
+
+            # Sum contributions from all links up to the current joint
             for j in range(7):
-                mli = self.mass[j]
-                #change in pe = force 
-                J_l = self.get_jacobian_centre_of_mass(joint_readings, j+1)[0:3,i]
-                J_l = J_l.reshape(3,1)
-                G_i += mli * np.matmul(np.array(g), J_l) 
+                mass_link = self.mass[j]
+                
+                # Compute the Jacobian of the centre of mass for the current link
+                J_com = self.get_jacobian_centre_of_mass(joint_readings, j + 1)[:3,i]
+                J_com = J_com.reshape(3,1)
+
+                # Compute the contribution of the link to the gravity term
+                G_i += mass_link * np.dot(g, J_com) 
                 
             G[i] = G_i
 
