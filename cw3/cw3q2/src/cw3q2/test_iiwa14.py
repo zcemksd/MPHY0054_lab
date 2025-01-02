@@ -45,8 +45,8 @@ def main():
         print("C matrices are equal", compare_matrices(C_student, C_kdl))
 
         print("Computing G vectors...")
-        G_student = student.get_G(joint_readings, joint_velocities)
-        G_kdl = kdl.get_G(joint_readings, joint_velocities)
+        G_student = student.get_G(joint_readings)
+        G_kdl = kdl.get_G(joint_readings)
         print("G vectors are equal", compare_matrices(G_student, G_kdl))
 
     except Exception as e:
