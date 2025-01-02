@@ -59,35 +59,20 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_readings) == 7
 
         # Your code starts here ----------------------------
+        # T07 * ROT * TRANS 
+        jacobian = np.zeros((6,7)) #INitialise the jacobian
+        T0Gi = self.forward_kinematics_centre_of_mass(joint_readings, up_to_joint)
+        p   = T0Gi[0:3,3]
+        T = []
+        for i in range(up_to_joint):
+            T.append(self.forward_kinematics(joint_readings, i))
+            Tr = T[i]
+            z_prev = Tr[0:3,2]
+            p_prev = Tr[0:3,3]
 
-        # Initialise the Jacobian matrix
-        jacobian = np.zeros((6, 7))
-
-        # Compute transformation matrices for the center of mass
-        T_base_com = [self.forward_kinematics_centre_of_mass(joint_readings, j + 1) for j in range(up_to_joint)]
-
-        # Compute the position of each center of mass
-        p_com = [T[:3, 3] for T in T_base_com]
-
-        # z-axis of base frame
-        z_axes = [np.array([0, 0, 1])]
-
-        # Compute z-axis of each joint frame in the base frame
-        for j in range(up_to_joint - 1):
-            T = self.forward_kinematics(joint_readings, j + 1)
-            z_axes.append(T[:3, 2])
-
-        # Compute Jacobian columns for each joint    
-        for i in range(up_to_joint): 
-            # Vector from joint to end-effection
-            p = p_com[up_to_joint - 1] - p_com[i]
-
-            # Linear velocity contribution
-            jacobian[:3, i] = np.cross(z_axes[i], p)
-
-            # Angular velocity contribution
-            jacobian[3:, i] = z_axes[i]
-
+            jacobian[0:3,i] = np.cross(z_prev, (p - p_prev))
+            jacobian[3:6, i] = z_prev
+        
         # Your code ends here ------------------------------
 
         assert jacobian.shape == (6, 7)
@@ -123,51 +108,31 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         """
         B = np.zeros((7, 7))
         
-        # Your code starts here ------------------------------
+	    # Your code starts here ------------------------------
+        #Lecture 9slide 16
+       
+        for i in range(1,8): 
+            #i+1
+            #Get transformation R from T
+            R0G = self.forward_kinematics_centre_of_mass(joint_readings, i)[0:3, 0:3]
+            
+            Ioli = np.zeros((3,3))
+            for j in range(3):
+                Ioli[j,j] = self.Ixyz[i-1, j]
+            Ioli = np.matmul(np.matmul(R0G,Ioli),R0G.T)
 
-        # Calculate contributions of each joint to the intertia matrix
-        for i in range(7):
-            # Compute Jacobian for the centre of mass of link i
-            J_com = self.get_jacobian_centre_of_mass(joint_readings, up_to_joint=i + 1)
-
-            # Extract linear and angular components of the Jacobian 
-            J_v = J_com[:3, :]
-            J_w = J_com[3:, :]
-
-            # Compute inertia contribution for link i
-            # Mass of link i
-            m_i = self.mass[i] 
-            # Inertia tensor in local frame
-            I_i = np.diag(self.Ixyz[i])
-
-            # Contribution to B from linear and angular terms
-            B += m_i * (J_v.T @ J_v) + (J_w.T @ I_i @ J_w)
-
-
+            mli = self.mass[i - 1]
+            Jcm = self.get_jacobian_centre_of_mass(joint_readings, i)
+            Jpli = Jcm[0:3, :]
+            Joli = Jcm[3:6, :]
+        
+            
+            B += mli * np.matmul(Jpli.T , Jpli) + np.matmul(np.matmul(Joli.T,Ioli),  Joli)
+            
         # Your code ends here ------------------------------
         
         return B
     
-    def get_B_derivative(self, i, j, k, joint_readings):
-        """
-        Compute derivative of inertia matrix element B_ij with respect to q_k.
-
-        Args:
-            i, j, k (int): Indices for matrix elements and joint variables.
-            joint_Readings (list): The state of the robot joints.
-
-        Returns:
-            float: Derivative of B_ij with respect to q_k.
-        """
-
-        delta_qk = np.zeros(7)
-        delta_qk[k] = 1e-6
-
-        B_plus_delta_qk = self.get_B((np.array(joint_readings) + delta_qk).tolist())
-        B_minus_delta_qk = self.get_B((np.array(joint_readings) - delta_qk).tolist())
-
-        return (B_plus_delta_qk[i, j] - B_minus_delta_qk[i, j]) / (2 * 1e-6)
-
     def get_C_times_qdot(self, joint_readings, joint_velocities):
         """Given the joint positions and velocities of the robot, compute Coriolis terms C.
         Args:
@@ -183,27 +148,38 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         assert len(joint_velocities) == 7
 
         # Your code starts here ------------------------------
+        #L9S19
+        # C = h_ijk qdot_k
+        B = self.get_B(joint_readings)
+        C = np.zeros((7,7))
+        
+        delta = 0.001 # small delta to approximate pde well
+        for i in range(7):
+            for j in range(7):
+                for k in range(7):
+                    q_k_copy = np.copy(joint_readings)
+                    q_k_copy[k] += delta
+                    bij = self.get_B(q_k_copy.tolist() ) # do this sum elementwise!
 
-        # Initialise Coriolis terms
-        C = np.zeros(7)
-
-        for k in range(7):
-            for i in range(7):
-                for j in range(7):
-                    # Christoffel symbols of the first kind
-                    c_ijk = 0.5 * (
-                        self.get_B_derivative(i, j, k, joint_readings) + 
-                        self.get_B_derivative(i, j, k, joint_readings) - 
-                        self.get_B_derivative(j, k, i, joint_readings)
-                        )
-                    # Compute Coriolis term
-                    C[k] += c_ijk * joint_velocities[j] * joint_velocities[k]
-
+                    q_i_copy = np.copy(joint_readings)
+                    q_i_copy[i] += delta
+                    bjk = self.get_B(q_i_copy.tolist() )
+                    
+                    dbij_dq = (bij[i,j] - B[i,j]) / delta
+                    dbjk_dq = (bjk[j,k] - B[j,k]) / delta
+                    
+                    C[i,j] += (dbij_dq - 0.5 * dbjk_dq) * joint_velocities[k]
+                    #sum_j (sum_k(h_ijk *q_dot_k *q_dot_j))     
+                    #print(str(type(C)))  
+                                
+        C = np.matmul(C, np.array(joint_velocities))
+        
         # Your code ends here ------------------------------
-
+        
         assert isinstance(C, np.ndarray)
         assert C.shape == (7,)
         return C
+
 
     def get_G(self, joint_readings):
         """Given the joint positions of the robot, compute the gravity matrix g.
@@ -215,32 +191,26 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
         """
         assert isinstance(joint_readings, list)
         assert len(joint_readings) == 7
-
+        
         # Your code starts here ------------------------------
-
-        # Initialise gravity vector
-        g = np.zeros(7)
-
-        # Gravity acceleration vector in base frame
-        gravity = np.array([0, 0, -self.g])
-
-        # Compute the transformation matrix to the center of mass of link i
+        #l9s17
+        G = np.zeros((7,))
+        g = [0,0,self.g]
+        g = np.array(g)
+        delta = 0.001
         for i in range(7):
-            T_com = self.forward_kinematics_centre_of_mass(joint_readings, up_to_joint=i + 1)
-
-            # Extract position of the centre of mass in the base frame
-            p_com = T_com[:3, 3]
-
-            # Compute the gravity force activing on the centre of mass 
-            F_g = self.mass[i] * gravity 
-
-            # Compute the torque due to gravity at joint i
-            z_axis = self.forward_kinematics(joint_readings, up_to_joint=i)[:3, 2]
-            torque = np.cross(p_com, F_g)
-            g[i] = np.dot(z_axis, torque)
+            G_i = 0
+            for j in range(7):
+                mli = self.mass[j]
+                #change in pe = force 
+                J_l = self.get_jacobian_centre_of_mass(joint_readings, j+1)[0:3,i]
+                J_l = J_l.reshape(3,1)
+                G_i += mli * np.matmul(np.array(g), J_l) 
+                
+            G[i] = G_i
 
         # Your code ends here ------------------------------
 
         assert isinstance(g, np.ndarray)
-        assert g.shape == (7,)
-        return g
+        assert G.shape == (7,)
+        return G
