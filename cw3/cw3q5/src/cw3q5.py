@@ -12,8 +12,7 @@ import matplotlib.pyplot as plt
 
 class JointAccelerationCalculator:
     def __init__(self):
-        self.time_stamps = []
-        self.acceleration_data = [np.array([]) for _ in range(7)]        
+        self.time_stamps = []       
 
     def load_trajectory(self):
         """Load trajectory from the bagfile and publish it."""
@@ -50,48 +49,43 @@ class JointAccelerationCalculator:
         
     def calculate_acceleration(self, joint_state):
         """Calculate joint accelerations using dynamics."""
+        print(f"Type of joint_state.position: {type(joint_state.position)}")
+        print(f"Type of joint_state.velocity: {type(joint_state.velocity)}")
+        print(f"Type of joint_state.effort: {type(joint_state.effort)}")
+
         q = np.array(joint_state.position)
         q_dot = np.array(joint_state.velocity)
         tau = np.array(joint_state.effort)
 
-        print(f"q shape: {q.shape}")
-        print(f"q_dot shape: {q_dot.shape}")
-        print(f"tau shape: {tau.shape}")
+        print(f"Type of q: {type(q)}")
+        print(f"Type of q_dot: {type(q_dot)}")
+        print(f"Type of tau: {type(tau)}")
 
         try:
             B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
-            C_qdot = Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot)
+            C_qdot = Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q , q_dot)
             G = Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q)
 
-            print(f"B shape: {B.shape}")
-            print(f"C_qdot shape: {C_qdot.shape}")
-            print(f"G shape: {G.shape}")
-
-            q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
-            print(f"q_ddot shape: {q_ddot.shape}")
+            q_ddot = np.matmul(np.linalg.inv(B), (tau - C_qdot - G)) 
+            q_ddot = q_ddot.reshape((7,))
 
             time_stamp = rospy.Time.now().to_sec()
             self.time_stamps.append(time_stamp)
 
-            for i in range(7):
-                if self.acceleration_data[i].size == 0:
-                    self.acceleration_data[i] = np.array([q_ddot[i]])
-                else:
-                    self.acceleration_data[i] = np.append(self.acceleration_data[i], q_ddot[i])
-            
-            self.plot_acceleration()
+            self.plot_acceleration(time_stamp, q_ddot)
 
         except Exception as e:
             rospy.logerr(f"Error calculating accelerations: {e}")
 
-    def plot_acceleration(self):
+    def plot_acceleration(self, time_stamp, q_ddot):
         """Plot joint accelerations as a function of time."""
         if len(self.time_stamps) < 2:
             return
         
         plt.clf()
         for i in range(7):
-            plt.plot(self.time_stamps, self.acceleration_data[i], label=f"Joint {i+1}")
+            joint_acceleration = [q_ddot[i] for _ in self.time_stamps]
+            plt.plot(self.time_stamps, joint_acceleration, label=f"Joint {i+1}")
 
         plt.title("Joint Acceleration Over Time")
         plt.xlabel("Time (s)")
