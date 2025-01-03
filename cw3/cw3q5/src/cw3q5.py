@@ -74,9 +74,10 @@ class JointAccelerationCalculator:
             self.time_stamps.append(time_stamp)
 
             for i in range(7):
-                self.acceleration_data[i].append(q_ddot[i])
-            
-            self.acceleration_data = np.array(self.acceleration_data)
+                if self.acceleration_data[i].size == 0:
+                    self.acceleration_data = np.array([q_ddot[i]])
+                else:
+                    self.acceleration_data[i]= np.append(self.acceleration_data[i], q_ddot[i])
             
             self.plot_accelerations()
 
