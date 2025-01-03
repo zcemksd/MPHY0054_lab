@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 class JointAccelerationCalculator:
     def __init__(self):
         self.time_stamps = []
-        self.acceleration_data = [[] for _ in range(7)]        
+        self.acceleration_data = [np.array([]) for _ in range(7)]        
 
     def load_trajectory(self):
         """Load trajectory from the bagfile and publish it."""
@@ -97,6 +97,7 @@ class JointAccelerationCalculator:
         plt.xlabel("Time (s)")
         plt.ylabel("Acceleration (rad/s^2)")
         plt.legend()
+        plt.draw()
         plt.pause(1e-5)
         
 
