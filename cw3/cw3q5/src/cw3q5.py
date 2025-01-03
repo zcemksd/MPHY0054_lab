@@ -1,53 +1,122 @@
 #!/usr/bin/env python3
 
-import rosbag
 import rospy
+import rosbag
 import rospkg
-import numpy as np
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
-import matplotlib.pyplot as plt
 from cw3q2.iiwa14DynKDL import Iiwa14DynamicKDL
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class JointAccelerationCalculator:
-    def __init__(self, bagfile_path, robot_topic):
-        self.bagfile_path = bagfile_path
-        self.robot_topic = robot_topic
-        self.kdl_solver = Iiwa14DynamicKDL
-        self.joint_states = []
+    def __init__(self):
         self.time_stamps = []
+        self.acceleration_data = [[] for _ in range(7)]        
 
-    def load_bagfile(self):
-        """ Loads the bagfile and extracts joint states and time stamps."""
+    def load_trajectory(self):
+        """Load trajectory from the bagfile and publish it."""
+
+        rospy.loginfo("Loading trajectory from bagfile...")
+        joint_traj = JointTrajectory()
+        rospack = rospkg.RosPack()
+        bagfile_path = rospack.get_path('cw3q5') + '/bag/cw3q5.bag'
+
         try:
             with rosbag.Bag(bagfile_path, 'r') as bag:
-                topics = bag.get_type_and_topic_info().topics
-                print(f"Bagfile contains {len(topics)} topics(s):")
-                for topic, info in topics.items():
-                    print(f"Topic: {topic}")
-                    print(f"  - Message Type: {info.msg_type}")
-                    print(f"  - Message Count: {info.message_count}")
-                    print(f"  - Frenquency: {info.frequency} Hz")
+                # Print message type, topic, and message count
+                topics = bag.get_type_and_topic_info()
 
-                print("\nPreviewing first few messages:")
+                for topic, msg, t in bag.read_messages(topics=['/iiwa/EffortJointInterface_trajectory_controller/command']):
+                    joint_traj.header.stamp = rospy.Time.now()
+                    joint_traj.joint_names = msg.joint_names
 
-            for topic, msg, t in bag.read_messages(topics=[self.robot_topic]):
-                print(f"Topic: {topic}, Time: {t.to_sec()}, Message: {msg}")
-                break
+                    for point in msg.points:
+                        point_obj = JointTrajectoryPoint()
+                        point_obj.positions = list(point.positions)
+                        point_obj.velocities = list(point.velocities)
+                        point_obj.accelerations = list(point.accelerations)
+                        point_obj.time_from_start = point.time_from_start
+                        joint_traj.points.append(point_obj)
+                    
+            rospy.loginfo("Trajectory successfully loaded from bagfile.")
+            return joint_traj
+
+
         except Exception as e:
-            print(f"Error reading bagfile: {e}")
+            rospy.logerr(f"Error loading trajectory from bagfile: {e}")
+            return None
+        
+    def calculate_acceleration(self, joint_state):
+        """Calculate joint accelerations using dynamics."""
+        q = np.array(joint_state.position)
+        q_dot = np.array(joint_state.velocity)
+        tau = np.array(joint_state.effort)
+
+        print(f"q shape: {q.shape}")
+        print(f"q_dot shape: {q_dot.shape}")
+        print(f"tau shape: {tau.shape}")
+
+        try:
+            B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
+            C_qdot = Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot)
+            G = Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q)
+
+            print(f"B shape: {B.shape}")
+            print(f"C_qdot shape: {C_qdot.shape}")
+            print(f"G shape: {G.shape}")
+
+            q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
+            print(f"q_ddot shape: {q_ddot.shape}")
+
+            time_stamp = rospy.Time.now().to_sec()
+            self.time_stamps.append(time_stamp)
+
+            for i in range(7):
+                self.acceleration_data[i].append(q_ddot[i])
+            
+            self.acceleration_data = np.array(self.acceleration_data)
+            
+            self.plot_accelerations()
+
+        except Exception as e:
+            rospy.logerr(f"Error calculating accelerations: {e}")
+
+    def plot_acceleration(self):
+        """Plot joint accelerations as a function of time."""
+        if len(self.time_stamps) < 2:
+            return
+        
+        plt.clf()
+        for i in range(7):
+            plt.plot(self.time_stamps, self.acceleration_data[i], label=f"Joint {i+1}")
+
+        plt.title("Joint Acceleration Over Time")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Acceleration (rad/s^2)")
+        plt.legend()
+        plt.pause(1e-5)
+        
 
 if __name__ == "__main__":
-    rospy.init_node("joint_acceleration_calculator")
 
-    # File and topic details
-    rospack = rospkg.RosPack()
-    bagfile_path = rospack.get_path('cw3q5') + '/bag/cw3q5.bag'
-    robot_topic = "/robot/joint_states"
+    try:
+        rospy.init_node("joint_acceleration_calculator", anonymous=True)
+        calculator = JointAccelerationCalculator()
 
-    calculator = JointAccelerationCalculator(bagfile_path, robot_topic)
+        joint_traj = calculator.load_trajectory()
+        if joint_traj:
+            traj_pub = rospy.Publisher('/iiwa/EffortJointInterface_trajectory_controller/command', JointTrajectory, queue_size=5)
+            rospy.sleep(1)
+            traj_pub.publish(joint_traj)
+            rospy.loginfo("Trajectory published to topic.")
 
-    # Load and process bagfile
-    calculator.load_bagfile()
+        rospy.Subscriber('/iiwa/joint_states', JointState, calculator.calculate_acceleration)
 
+        plt.ion()
+        plt.show()
+        rospy.spin()
+
+    except rospy.ROSInterruptException:
+        rospy.loginfo("ROS node terminated.")
