@@ -79,21 +79,29 @@ class JointAccelerationCalculator:
         print(f"Type of q: {type(q)}")
         print(f"Type of q_dot: {type(q_dot)}")
         print(f"Type of tau: {type(tau)}")
+        print(f"tau shape: {tau.shape}")
 
         try:
             # Calculate dynamic components 
             B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
-            C_qdot = Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot)
-            G = Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q)
+            C_qdot = np.array(Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot))
+            G = np.array(Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q))
 
-            print(f"Length of B: {len(B)}")
-            print(f"Length of C_qdot: {len(C_qdot)}")
-            print(f"Length of G: {len(G)}")
+            print(f"B shape: {B.shape}, B:{B}")
+            print(f"C_qdot shape: {C_qdot.shape}, C_qdot:{C_qdot}")
+            print(f"G shape: {G.shape}, B:{G}")
+            print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
+            
+
+            if B.shape != (7, 7):
+                rospy.logerr(f"Invalid B matrix shape: {B.shape}. Expected (7, 7).")
+                return
 
             # Compute joint accelerations
             q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
+            q_ddot = q_ddot.reshape((7,))
 
-            print(f"Length of q_ddot: {len(q_ddot)}")
+            print(f"q_ddot shape: {q_ddot.shape}")
 
             # Store data
             stamp = joint_state.header.stamp
