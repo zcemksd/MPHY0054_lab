@@ -89,10 +89,6 @@ class JointAccelerationCalculator:
         print(f"G shape: {G.shape}, B:{G}")
         print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
 
-        # Store time stamp
-        stamp = joint_state.header.stamp
-        time = stamp.secs + stamp.nsecs * 1e-9
-
         # Compute joint accelerations
         q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
 
@@ -103,24 +99,15 @@ class JointAccelerationCalculator:
         print(f"q_ddot shape: {q_ddot.shape}")
 
 
-        self.plot_acceleration(time, q_ddot)
-
-
-    def plot_acceleration(self, time, q_ddot):
+    def plot_acceleration(self, q_ddot, time):
         """Plot joint accelerations as a function of time."""
 
         rospy.loginfo("Plotting joint accelerations...")
-        
-        plt.clf()
-
-        self.time_stamps.append(time)
-        for i in range(7):
-            self.joint_accelerations[i].append(q_ddot[i])
 
         for i in range(7):
             plt.plot(
-                self.time_stamps,
-                self.joint_accelerations[i],
+                time,
+                q_ddot[i],
                 label=f"Joint {i+1}"
             )
         
