@@ -61,9 +61,7 @@ class JointAccelerationCalculator:
                         joint_traj.points.append(point_obj)
 
                 # Print message type, number of message, and content of the messages
-                print(f"Type of message: {type(msg)}")
-                print(f"Number of messaged: {message_count}")
-                print(f"Content of the messages: {msg}")
+                print(f"Loaded {message_count} messages with joint names: {joint_traj.joint_names}")
                     
             rospy.loginfo("Trajectory successfully loaded from bagfile.")
             print(f"Loaded trajectory: {joint_traj}")
