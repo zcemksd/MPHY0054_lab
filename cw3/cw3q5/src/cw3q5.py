@@ -51,6 +51,7 @@ class JointAccelerationCalculator:
                         joint_traj.points.append(point_obj)
                     
             rospy.loginfo("Trajectory successfully loaded from bagfile.")
+            print(f"Loaded trajectory: {joint_traj}")
 
             return joint_traj
 
@@ -66,74 +67,68 @@ class JointAccelerationCalculator:
             joint_state (JointState): The joint state message containing positions, velocity, and effort.
         """
 
-        print(f"Type of joint_state.position: {type(joint_state.position)}")
-        print(f"Type of joint_state.velocity: {type(joint_state.velocity)}")
-        print(f"Type of joint_state.effort: {type(joint_state.effort)}")
-
         rospy.loginfo("Calculating joint accelerations...")
 
         q = np.array(joint_state.position)
         q_dot = np.array(joint_state.velocity)
         tau = np.array(joint_state.effort)
 
-        print(f"Type of q: {type(q)}")
-        print(f"Type of q_dot: {type(q_dot)}")
-        print(f"Type of tau: {type(tau)}")
-        print(f"tau shape: {tau.shape}")
-
-        try:
-            # Calculate dynamic components 
-            B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
-            C_qdot = np.array(Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot))
-            G = np.array(Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q))
-
-            print(f"B shape: {B.shape}, B:{B}")
-            print(f"C_qdot shape: {C_qdot.shape}, C_qdot:{C_qdot}")
-            print(f"G shape: {G.shape}, B:{G}")
-            print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
+        print(f"q shape: {q.shape}, q:{q}")
+        print(f"q_dot shape: {q_dot.shape}, q_dot:{q_dot}")
+        print(f"tau shape: {tau.shape}, tau:{tau}")
             
 
-            if B.shape != (7, 7):
-                rospy.logerr(f"Invalid B matrix shape: {B.shape}. Expected (7, 7).")
-                return
+        
+        # Calculate dynamic components 
+        B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
+        C_qdot = np.array(Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot))
+        G = np.array(Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q))
 
-            # Compute joint accelerations
-            q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
-            q_ddot = q_ddot.reshape((7,))
+        print(f"B shape: {B.shape}, B:{B}")
+        print(f"C_qdot shape: {C_qdot.shape}, C_qdot:{C_qdot}")
+        print(f"G shape: {G.shape}, B:{G}")
+        print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
 
-            print(f"q_ddot shape: {q_ddot.shape}")
+        # Store time stamp
+        stamp = joint_state.header.stamp
+        time = stamp.secs + stamp.nsecs * 1e-9
 
-            # Store data
-            stamp = joint_state.header.stamp
-            time = stamp.secs + stamp.nsecs * 1e-9
-            self.time_stamps.append(time)
+        # Compute joint accelerations
+        q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
 
-            for i in range(7):
-                self.joint_accelerations[i].append(q_ddot[i])
-                print(f"Joint {i+1} acceleration data length: {len(self.joint_accelerations[i])}")
+        print(f"np.linalg.inv(B) shape: {np.linalg.inv(B).shape}")
 
-            rospy.loginfo(f"Joint accelerations calculated:{q_ddot}")
-            self.plot_acceleration()
+        q_ddot = q_ddot.reshape((7,))
 
-        except Exception as e:
-            rospy.logerr(f"Error calculating accelerations: {e}")
+        print(f"q_ddot shape: {q_ddot.shape}")
 
-    def plot_acceleration(self):
+
+        self.plot_acceleration(time, q_ddot)
+
+
+    def plot_acceleration(self, time, q_ddot):
         """Plot joint accelerations as a function of time."""
 
         rospy.loginfo("Plotting joint accelerations...")
-
-        if len(self.time_stamps) < 2:
-            return
         
         plt.clf()
-        for i in range(7):
-            plt.plot(self.time_stamps, self.joint_accelerations[i], label=f"Joint {i+1}")
 
+        self.time_stamps.append(time)
+        for i in range(7):
+            self.joint_accelerations[i].append(q_ddot[i])
+
+        for i in range(7):
+            plt.plot(
+                self.time_stamps,
+                self.joint_accelerations[i],
+                label=f"Joint {i+1}"
+            )
+        
         plt.title("Joint Acceleration Over Time")
         plt.xlabel("Time (s)")
         plt.ylabel("Acceleration (rad/s^2)")
         plt.legend(loc="upper right")
+
         plt.draw()
         plt.pause(1e-5)
         
