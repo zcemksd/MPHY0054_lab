@@ -15,11 +15,11 @@ class JointAccelerationCalculator:
     Class to manage trajectory planning and acceleration calculation for the iiwa robot.
     """
     def __init__(self):
-        # List to store timestamps
+        # List to store timestamps i.e. time for each joint state
         self.time_stamps = []   
 
         # Store acceleration data for each joint
-        self.joint_accelerations = [[] for _ in range(7)]    
+        self.joint_accelerations = np.zeros((7,))  
 
     def load_trajectory(self):
         """
@@ -98,26 +98,34 @@ class JointAccelerationCalculator:
 
         print(f"q_ddot shape: {q_ddot.shape}")
 
-
-    def plot_acceleration(self, q_ddot, time):
-        """Plot joint accelerations as a function of time."""
-
-        rospy.loginfo("Plotting joint accelerations...")
-
-        for i in range(7):
-            plt.plot(
-                time,
-                q_ddot[i],
-                label=f"Joint {i+1}"
-            )
+        self.plot_acceleration(joint_state.header.stamp, q_ddot)
         
-        plt.title("Joint Acceleration Over Time")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Acceleration (rad/s^2)")
-        plt.legend(loc="upper right")
+    def plot_acceleration(self, stamp, q_ddot):
+        """Plot the joint accelerations as a function of time."""
 
-        plt.draw()
+        time = stamp.secs + stamp.nsecs * 1e-9
+        self.time_stamps.append(time)
+        print(f"Time in seconds: {time}")
+
+        plt.plot(time, q_ddot[:,0], 'k*', label='Joint 1')
+        plt.plot(time, q_ddot[:,1], 'r*', label='Joint 2')
+        plt.plot(time, q_ddot[:,2], 'b*', label='Joint 3')
+        plt.plot(time, q_ddot[:,3], 'g*', label='Joint 4')
+        plt.plot(time, q_ddot[:,4], 'm*', label='Joint 5')
+        plt.plot(time, q_ddot[:,5], 'c*', label='Joint 6')
+        plt.plot(time, q_ddot[:,6], 'y*', label='Joint 7')
+
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys())
+        
+        plt.title('Joint Accelerations vs Time')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Joint Acceleration (rad/s^2)')
+
+        plt.draw
         plt.pause(1e-5)
+
         
 
 if __name__ == "__main__":
