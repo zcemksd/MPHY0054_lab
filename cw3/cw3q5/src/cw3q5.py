@@ -15,12 +15,15 @@ class JointAccelerationCalculator:
     Class to manage trajectory planning and acceleration calculation for the iiwa robot.
     """
     def __init__(self):
+        """
+        Initialise the JointAccelerationCalculator class.
+        """
         # List to store timestamps i.e. time for each joint state
         self.time_stamps = []   
 
         # Store acceleration data for each joint
         self.joint_accelerations = np.zeros((7,))  
-        
+
 
     def load_trajectory(self):
         """
@@ -34,7 +37,7 @@ class JointAccelerationCalculator:
         joint_traj = JointTrajectory()
         joint_traj.header.stamp = rospy.Time.now()
 
-
+        # Resolve path to the bagfile
         rospack = rospkg.RosPack()
         bagfile_path = rospack.get_path('cw3q5') + '/bag/cw3q5.bag'
 
@@ -42,10 +45,12 @@ class JointAccelerationCalculator:
             with rosbag.Bag(bagfile_path, 'r') as bag:
                 # Initialise message count
                 message_count = 0
+
                 for topic, msg, t in bag.read_messages(topics=['/iiwa/EffortJointInterface_trajectory_controller/command']):
                     # Increment message count
                     message_count += 1
                     joint_traj.joint_names = msg.joint_names
+
                     for point in msg.points:
                         point_obj = JointTrajectoryPoint(
                         positions=point.positions,
@@ -80,6 +85,7 @@ class JointAccelerationCalculator:
 
         rospy.loginfo("Calculating joint accelerations...")
 
+        # Extract joint positions, velocities, and efforts.
         q = np.array(joint_state.position)
         q_dot = np.array(joint_state.velocity)
         tau = np.array(joint_state.effort)
@@ -88,26 +94,27 @@ class JointAccelerationCalculator:
         print(f"q_dot shape: {q_dot.shape}, q_dot:{q_dot}")
         print(f"tau shape: {tau.shape}, tau:{tau}")
         
-        # Calculate dynamic components 
-        B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
-        C_qdot = np.array(Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot))
-        G = np.array(Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q))
+        try:
+            # Calculate dynamic components 
+            B = Iiwa14DynamicKDL.get_B(Iiwa14DynamicKDL(), q)
+            C_qdot = np.array(Iiwa14DynamicKDL.get_C_times_qdot(Iiwa14DynamicKDL(), q, q_dot))
+            G = np.array(Iiwa14DynamicKDL.get_G(Iiwa14DynamicKDL(), q))
 
-        print(f"B shape: {B.shape}, B:{B}")
-        print(f"C_qdot shape: {C_qdot.shape}, C_qdot:{C_qdot}")
-        print(f"G shape: {G.shape}, B:{G}")
-        print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
+            print(f"B shape: {B.shape}, B:{B}")
+            print(f"C_qdot shape: {C_qdot.shape}, C_qdot:{C_qdot}")
+            print(f"G shape: {G.shape}, B:{G}")
+            print(f"tau - C_qdot - G shape: {(tau - C_qdot - G).shape}")
 
-        # Compute joint accelerations
-        q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
+            # Compute joint accelerations
+            q_ddot = np.linalg.inv(B).dot(tau - C_qdot - G)
+            q_ddot = q_ddot.reshape((7,))
 
-        print(f"np.linalg.inv(B) shape: {np.linalg.inv(B).shape}")
+            print(f"q_ddot shape: {q_ddot.shape}")
 
-        q_ddot = q_ddot.reshape((7,))
+            self.plot_acceleration(joint_state.header.stamp, q_ddot)
 
-        print(f"q_ddot shape: {q_ddot.shape}")
-
-        self.plot_acceleration(joint_state.header.stamp, q_ddot)
+        except Exception as e:
+            rospy.logerr(f"Error during matrix inversion: {e}")
 
         
     def plot_acceleration(self, stamp, q_ddot):
@@ -119,10 +126,12 @@ class JointAccelerationCalculator:
             q_ddot (numpy.ndarray): The calculated joint accelerations.
         """
 
+        # Convert ROS time to seconds
         time = stamp.secs + stamp.nsecs * 1e-9
         self.time_stamps.append(time)
         print(f"Time in seconds: {time}")
 
+        # Plot each joint and add label to the legend
         plt.plot(time, q_ddot[:,0], 'k*', label='Joint 1')
         plt.plot(time, q_ddot[:,1], 'r*', label='Joint 2')
         plt.plot(time, q_ddot[:,2], 'b*', label='Joint 3')
@@ -131,10 +140,12 @@ class JointAccelerationCalculator:
         plt.plot(time, q_ddot[:,5], 'c*', label='Joint 6')
         plt.plot(time, q_ddot[:,6], 'y*', label='Joint 7')
 
+        # Legend displays each joint once
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys())
         
+        # Add title and axis titles to the graph
         plt.title('Joint Accelerations vs Time')
         plt.xlabel('Time (s)')
         plt.ylabel('Joint Acceleration (rad/s^2)')
