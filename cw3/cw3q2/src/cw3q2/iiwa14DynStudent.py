@@ -171,7 +171,7 @@ class Iiwa14DynamicRef(Iiwa14DynamicBase):
                     # Perturb the joint positions for the kth joint
                     p_k = np.copy(joint_readings)
                     p_k[k] += delta
-                    B_ij = self.get_B(p_k.tolist() )
+                    B_ij = self.get_B(p_k.tolist())
 
                     # Perturb the joint positions for the ith joint
                     p_i = np.copy(joint_readings)
